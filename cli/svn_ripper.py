@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # Licence: MIT
 # Copyright (c) 2025 Dardan Prebreza / Pretera
