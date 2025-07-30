@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # Licence: MIT
 # Copyright (c) 2025 Dardan Prebreza / Pretera
@@ -5,26 +6,24 @@
 import requests
 import os
 import gzip
-from urllib.parse import urljoin
-import urllib3
 import argparse
+from urllib.parse import urljoin
+from datetime import datetime
+import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def print_logo():
     print("""
-
 ███████╗██╗   ██╗███╗   ██╗      ██████╗ ██╗██████╗ ██████╗ ███████╗██████╗ 
 ██╔════╝██║   ██║████╗  ██║      ██╔══██╗██║██╔══██╗██╔══██╗██╔════╝██╔══██╗
 ███████╗██║   ██║██╔██╗ ██║█████╗██████╔╝██║██████╔╝██████╔╝█████╗  ██████╔╝
 ╚════██║╚██╗ ██╔╝██║╚██╗██║╚════╝██╔══██╗██║██╔═══╝ ██╔═══╝ ██╔══╝  ██╔══██╗
 ███████║ ╚████╔╝ ██║ ╚████║      ██║  ██║██║██║     ██║     ███████╗██║  ██║
 ╚══════╝  ╚═══╝  ╚═╝  ╚═══╝      ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝     ╚══════╝╚═╝  ╚═╝
-                                                   
               SVN-Ripper | Pretera.com
         Recover source from leaked .svn metadata
 """)
-
 
 def fetch_entries(url):
     entries_url = urljoin(url, '.svn/entries')
@@ -63,6 +62,35 @@ def try_decode(data):
         except:
             return None
 
+def render_html_report_template(template_path, report_data):
+    with open(template_path, "r", encoding="utf-8") as f:
+        template = f.read()
+
+    rows_html = ""
+    for item in report_data:
+        status_class = {
+            'OK': 'status-ok',
+            'FAILED': 'status-failed',
+            'UNDECODABLE': 'status-undecodable'
+        }.get(item['status'].upper(), '')
+        rows_html += (
+            f"<tr>"
+            f"<td>{item['file']}</td>"
+            f"<td class='{status_class}'>{item['status']}</td>"
+            f"<td>{item['size']}</td>"
+            f"<td>{item['saved_as'] or ''}</td>"
+            f"</tr>\n"
+        )
+
+    return template.replace("{date}", datetime.now().strftime("%Y-%m-%d %H:%M:%S")).replace("{rows}", rows_html)
+
+def save_html_report(report_data, outdir, template_path):
+    html_content = render_html_report_template(template_path, report_data)
+    out_path = os.path.join(outdir, f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html')
+    with open(out_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    print(f"[+] HTML report saved to {out_path}")
+
 def download_and_decode(base_url, filepath, outdir='recovered'):
     os.makedirs(outdir, exist_ok=True)
     svn_url = urljoin(base_url, f'.svn/text-base/{filepath}.svn-base')
@@ -72,7 +100,7 @@ def download_and_decode(base_url, filepath, outdir='recovered'):
     r = requests.get(svn_url, verify=False)
     if r.status_code != 200:
         print(f'[-] Failed to download {filepath} (HTTP {r.status_code})')
-        return
+        return {'file': filepath, 'status': 'FAILED', 'size': len(r.content), 'saved_as': None}
 
     content = try_decode(r.content)
     if content:
@@ -80,55 +108,37 @@ def download_and_decode(base_url, filepath, outdir='recovered'):
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(content)
         print(f'[+] Saved decoded file: {output_path}')
+        return {'file': filepath, 'status': 'OK', 'size': len(r.content), 'saved_as': output_path}
     else:
         print(f'[-] Could not decode: {filepath}')
+        return {'file': filepath, 'status': 'UNDECODABLE', 'size': len(r.content), 'saved_as': None}
 
-
-def main():
-    print_logo()
-    parser = argparse.ArgumentParser(description='SVN-Ripper - Extract source code from .svn metadata')
-    parser.add_argument('-u', '--url', help='Target base URL (e.g., https://target.com/)', required=False)
-    parser.add_argument('-l', '--list', help='File containing list of target URLs', required=False)
-    parser.add_argument('-o', '--out', help='Output directory (default: recovered)', default='recovered')
-    args = parser.parse_args()
-
-    targets = []
-    if args.url:
-        targets.append(args.url.strip())
-    elif args.list:
-        with open(args.list) as f:
-            targets = [line.strip() for line in f if line.strip()]
-
-    if not targets:
-        print('[-] Please provide either -u or -l.')
-        parser.print_help()
-        return
-
-    for base_url in targets:
-        print(f"\n[+] Processing: {base_url}")
-        entries = fetch_entries(base_url)
-        if not entries:
-            continue
-        files = parse_entries(entries)
-        print(f'[+] Found {len(files)} files:')
-        for f in files:
-            print('  -', f)
-        for f in files:
-            download_and_decode(base_url, f, args.out)
-
-    print_logo()
-    base_url = input('Enter target base URL (e.g., https://target.com/): ').strip()
+def process_url(base_url, outdir, template_path):
     entries = fetch_entries(base_url)
     if not entries:
         return
-
     files = parse_entries(entries)
     print(f'[+] Found {len(files)} files:')
     for f in files:
         print('  -', f)
+    results = [download_and_decode(base_url, f, outdir) for f in files]
+    save_html_report(results, outdir, template_path)
 
-    for f in files:
-        download_and_decode(base_url, f)
+def main():
+    print_logo()
+    parser = argparse.ArgumentParser(description='Recover source from exposed .svn folders')
+    parser.add_argument('-u', '--url', help='Single target URL')
+    parser.add_argument('-l', '--list', help='File with list of URLs')
+    parser.add_argument('-o', '--out', default='recovered', help='Output directory')
+    parser.add_argument('-t', '--template', default='html_report_template.html', help='Path to HTML template')
+
+    args = parser.parse_args()
+    if not args.url and not args.list:
+        parser.error('Specify either -u for a single URL or -l for a file of URLs.')
+
+    urls = [args.url] if args.url else open(args.list).read().splitlines()
+    for url in urls:
+        process_url(url.strip(), args.out, args.template)
 
 if __name__ == '__main__':
     main()
