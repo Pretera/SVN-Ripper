@@ -113,7 +113,7 @@ The tool produces machine-readable reports (HTML & JSON), making it easy to:
 
 ## Demo
 
-![SVN-Ripper Report Screenshot](https://pretera.com/assets/svn-ripper-demo.png)
+![SVN-Ripper Report Screenshot](/assets/svn-ripper-demo.gif)
 
 ---
 
@@ -141,16 +141,16 @@ export HTTPS_PROXY=http://127.0.0.1:8080
 
 ---
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License.  
 See [LICENSE.txt](LICENSE.txt) for more details.
 
 ---
 
-## 🤝 Credits
+## Credits
 
-Created by [Dardan Prebreza](https://pretera.com) — Offensive Security Lead @ Pretera  
-Maintained by the [Pretera Offensive Team](https://pretera.com)
+Created by [Dardan Prebreza](https://www.pretera.com) — Offensive Security Lead @ Pretera  
+Maintained by the [Pretera Offensive Team](https://www.pretera.com)
 
 ---
