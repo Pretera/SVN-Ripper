@@ -7,7 +7,8 @@
 **SVN-Ripper** is a security tool that recovers full source code from `.svn` version control metadata accidentally exposed to the internet. Additionnaly, we have developed a sub-tool that uses Google Dorks to automatically find exposed `.svn` repositories on the internet using Google, Bing Search and SerpAPI.
 
 Developed by [Pretera](https://pretera.com)  
-Blog: [Tool Release: SVN-Ripper](https://pretera.com/blogs/svn-ripper)
+Blog: [When Source Code Hides in Plain Sight – Introducing SVN-Ripper
+](https://www.pretera.com/when-source-code-hides-in-plain-sight-introducing-svn-ripper/)
 
 ---
 
@@ -113,7 +114,7 @@ The tool produces machine-readable reports (HTML & JSON), making it easy to:
 
 ## Demo
 
-![SVN-Ripper Report Screenshot](/assets/svn-ripper-demo.gif)
+![SVN-Ripper Report Screenshot](https://www.pretera.com/wp-content/uploads/2025/07/svn_ripper_report_screenshot.png)
 
 ---
 
