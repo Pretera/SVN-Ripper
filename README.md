@@ -151,7 +151,6 @@ See [LICENSE.txt](LICENSE.txt) for more details.
 
 ## Credits
 
-Created by [Dardan Prebreza](https://www.pretera.com) — Offensive Security Lead @ Pretera  
-Maintained by the [Pretera Offensive Team](https://www.pretera.com)
+Created and Maintained by the [Pretera Offensive Team](https://www.pretera.com)
 
 ---
