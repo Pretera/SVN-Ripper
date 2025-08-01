@@ -15,7 +15,7 @@ Blog: [Tool Release: SVN-Ripper](https://pretera.com/blogs/svn-ripper)
 
 - **Auto-fetch exposed `.svn/entries` files**
 - **Reconstruct folder tree and decode `.svn-base` files**
-- **Restore PHP, JS, HTML, PDF, and other real extensions**
+- **Restore PHP, JS, HTML, PDF, and other file extensions**
 - **Generate beautiful HTML reports and JSON exports**
 - **Package recovered files into timestamped ZIPs**
 - **Proxy support (e.g., Burp Suite, WAF bypass)**
